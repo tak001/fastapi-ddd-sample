@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    container_name: fastapi-ddd-sample-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src:cached
+      - ./tests:/app/tests:cached
+    environment:
+      - PYTHONPATH=/app/src
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
