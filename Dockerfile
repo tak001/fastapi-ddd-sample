@@ -13,8 +13,9 @@ COPY tests/ ./tests/
 ENV PYTHONPATH=/app/src
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV UV_NO_CACHE=1
 
-RUN adduser --system --no-create-home appuser
+RUN adduser --system --no-create-home appuser && chown -R appuser /app
 USER appuser
 
 CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
