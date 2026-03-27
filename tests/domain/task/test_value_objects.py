@@ -1,7 +1,7 @@
 import pytest
 
-from domain.task.value_objects import TaskId, TaskStatus, TaskTitle
 from domain.task.exceptions import TaskValidationError
+from domain.task.value_objects import TaskDueDate, TaskId, TaskPriority, TaskStatus, TaskTitle
 
 
 class TestTaskId:
@@ -66,3 +66,37 @@ class TestTaskTitle:
         title = TaskTitle(value="Test")
         with pytest.raises(AttributeError):
             title.value = "Changed"  # type: ignore[misc]
+
+
+class TestTaskPriority:
+    def test_has_high_priority(self) -> None:
+        assert TaskPriority.HIGH.value == "high"
+
+    def test_has_medium_priority(self) -> None:
+        assert TaskPriority.MEDIUM.value == "medium"
+
+    def test_has_low_priority(self) -> None:
+        assert TaskPriority.LOW.value == "low"
+
+
+class TestTaskDueDate:
+    def test_valid_date(self) -> None:
+        due_date = TaskDueDate(value="2026-04-01")
+        assert due_date.value == "2026-04-01"
+
+    def test_invalid_format_raises_error(self) -> None:
+        with pytest.raises(TaskValidationError, match="YYYY-MM-DD"):
+            TaskDueDate(value="2026/04/01")
+
+    def test_empty_string_raises_error(self) -> None:
+        with pytest.raises(TaskValidationError, match="YYYY-MM-DD"):
+            TaskDueDate(value="")
+
+    def test_partial_date_raises_error(self) -> None:
+        with pytest.raises(TaskValidationError, match="YYYY-MM-DD"):
+            TaskDueDate(value="2026-04")
+
+    def test_is_immutable(self) -> None:
+        due_date = TaskDueDate(value="2026-04-01")
+        with pytest.raises(AttributeError):
+            due_date.value = "2026-05-01"  # type: ignore[misc]

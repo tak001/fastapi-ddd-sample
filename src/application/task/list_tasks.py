@@ -15,6 +15,9 @@ class TaskItem:
     title: str
     description: str
     status: str
+    priority: str
+    goal_id: str | None
+    due_date: str | None
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,9 @@ class ListTasksUseCase(UseCase[ListTasksQuery, ListTasksResult]):
                     title=task.title.value,
                     description=task.description,
                     status=task.status.value,
+                    priority=task.priority.value,
+                    goal_id=task.goal_id.value if task.goal_id else None,
+                    due_date=task.due_date.value if task.due_date else None,
                 )
                 for task in tasks
             ]
