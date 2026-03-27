@@ -16,7 +16,7 @@ from infrastructure.config.di import (
     get_send_message_use_case,
 )
 
-app = FastAPI(title="Task API", version="0.1.0")
+app = FastAPI(title="Task API", version="0.1.1")
 
 app.include_router(
     create_task_router(get_create_task_use_case, get_get_task_use_case, get_list_tasks_use_case)
