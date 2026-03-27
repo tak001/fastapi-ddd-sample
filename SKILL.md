@@ -17,13 +17,16 @@ description: >
 ### 1. 依存方向は内側のみ
 
 ```
+Adapters       → Application → Domain
 Infrastructure → Application → Domain
-  (外側)           (中間)        (内側・最重要)
+  (外側)              (中間)      (内側・最重要)
 ```
 
 - **Domain 層は何にも依存しない**（`dataclass`, `enum`, `abc`, `uuid` のみ許可）
 - Application 層は Domain にのみ依存する
+- Adapters 層は Application にのみ依存する（Infrastructure への依存は禁止）
 - Infrastructure 層は Domain と Application に依存する
+- Composition Root（`di.py`）のみが全層を参照できる唯一の例外
 - **逆方向の依存は絶対に禁止**
 
 ### 2. TDD で開発する（例外なし）
@@ -97,21 +100,36 @@ def change_status(self, new_status: TaskStatus) -> None:
 - HTTP, DB などの具体的な技術への依存
 - ドメインエンティティをそのまま外部に返す
 
-### Infrastructure 層 (`src/infrastructure/`)
+### Adapters 層 (`src/adapters/`)
 
-**外部技術との接続。FastAPI, DB, 外部 API の実装。**
+**Interface Adapters。外部世界と Application 層を繋ぐ変換層。**
 
 | 要素 | 配置場所 | 説明 |
 |------|---------|------|
-| 駆動アダプタ (Driven) | `persistence/` | Repository の具体実装 (InMemory, DB など) |
-| ドライバアダプタ (Driver) | `http/` | FastAPI ルーター（HTTP → UseCase 変換） |
-| スキーマ | `http/schemas/` | Pydantic v2 のリクエスト/レスポンス定義 |
+| Driving Adapter (HTTP) | `http/` | FastAPI ルーター（HTTP → UseCase 変換） |
+| HTTP スキーマ | `http/schemas/` | Pydantic v2 のリクエスト/レスポンス定義 |
+| Driven Adapter (Agent) | `agent/` | ChatAgentPort の具体実装（LangGraph など） |
+
+**ルール:**
+- Adapters 層は Application 層にのみ依存する
+- `infrastructure/` への直接依存は禁止（Composition Root 経由で注入する）
+- ルーターはルーティングと Schema 変換のみ行う（ビジネスロジックを書かない）
+
+### Infrastructure 層 (`src/infrastructure/`)
+
+**Frameworks & Drivers。外部技術の具体実装。**
+
+| 要素 | 配置場所 | 説明 |
+|------|---------|------|
+| Driven Adapter (DB) | `persistence/` | Repository の具体実装 (InMemory, DB など) |
+| Agent フレームワーク | `agent/` | LangGraph グラフ・ノード・State の実装 |
 | Composition Root | `config/di.py` | **全依存関係の配線はここだけ** |
 
 **Composition Root (di.py) のルール:**
 - 依存の組み立ては `di.py` に集約する
 - FastAPI の `Depends()` でユースケースを注入する
 - 新しいユースケースを追加したら必ず `di.py` にも追加する
+- `di.py` は全層（domain/application/adapters/infrastructure）を参照できる唯一の例外
 
 ---
 
@@ -132,7 +150,7 @@ tests/{layer}/{aggregate}/test_{feature}.py
 ### 2. 実装する (Green)
 
 ```
-Domain 層 → Application 層 → Infrastructure 層
+Domain 層 → Application 層 → Adapters 層 / Infrastructure 層
 ```
 
 - テストが **通る最小限のコード** を書く
@@ -177,7 +195,7 @@ docker compose exec api uv run pytest -v
 | ルール | 詳細 |
 |--------|------|
 | ルーターでロジックを書かない | UseCase を呼ぶだけにする |
-| Pydantic はインフラ層のみ | Domain 層で Pydantic を使わない |
+| Pydantic は Adapters 層のみ | Domain 層で Pydantic を使わない |
 | 例外ハンドラ | ドメイン例外は `main.py` で HTTP ステータスに変換する |
 | DI | `Depends()` + `di.py` で注入する |
 
@@ -251,11 +269,11 @@ class DeleteTaskUseCase(UseCase[DeleteTaskCommand, None]):
         self._task_repository.delete(task.id)
 ```
 
-### Step 3: Infrastructure 層
+### Step 3: Adapters 層 / Infrastructure 層
 
 1. `TaskRepository` ABC に `delete` メソッドを追加
-2. `InMemoryTaskRepository` に実装
-3. `task_router.py` に `DELETE /tasks/{id}` を追加
+2. `InMemoryTaskRepository` に実装（`infrastructure/persistence/`）
+3. `adapters/http/task_router.py` に `DELETE /tasks/{id}` を追加
 4. `di.py` に `DeleteTaskUseCase` を配線
 
 ### Step 4: 全テスト実行
@@ -272,7 +290,8 @@ docker compose exec api uv run pytest -v
 |----|-----------|---------|---------|
 | Domain | 単体テスト | なし | 最速 |
 | Application | 単体テスト | InMemory Repository | 速い |
-| Infrastructure | 統合テスト | InMemory / TestClient | 普通 |
+| Adapters | 統合テスト | TestClient / MockUseCase | 普通 |
+| Infrastructure | 統合テスト | InMemory / MockLLM | 普通 |
 
 ### テストの書き方
 
